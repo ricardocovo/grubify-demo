@@ -1,0 +1,3 @@
+[submodule "labs/starter-lab/src/grubify"]
+	path = labs/starter-lab/src/grubify
+	url = https://github.com/dm-chelupati/grubify.git

@@ -60,6 +60,22 @@ Deploy an Azure SRE Agent, break a sample app, and watch it diagnose and fix the
 
 - [GitHub account](https://github.com) — fork [dm-chelupati/grubify](https://github.com/dm-chelupati/grubify/fork) for Scenarios 2 & 3
 
+### Grubify Application Source
+
+The application is tracked as a Git submodule at `src/grubify`, sourced from
+`https://github.com/dm-chelupati/grubify.git`. Keeping it as a submodule preserves
+upstream provenance because that repository does not publish a root license file.
+
+After cloning this repository, initialize the application source before building:
+
+```bash
+git submodule update --init --recursive
+```
+
+CI pipelines must also fetch submodules. For GitHub Actions, configure
+`actions/checkout` with `submodules: recursive`. Container images should use the
+pinned submodule commit as their immutable tag.
+
 ## Quick Start
 
 ### One-Command Setup (Recommended)
