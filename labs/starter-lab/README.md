@@ -73,8 +73,27 @@ git submodule update --init --recursive
 ```
 
 CI pipelines must also fetch submodules. For GitHub Actions, configure
-`actions/checkout` with `submodules: recursive`. Container images should use the
-pinned submodule commit as their immutable tag.
+`actions/checkout` with `submodules: recursive`.
+
+Application fixes are maintained in
+[`patches/grubify-app-fixes.patch`](patches/grubify-app-fixes.patch) in **this
+repository**, not pushed to the upstream app repository. The submodule stays
+pinned to upstream commit `6592accc6eef73e2d7c7339885386480cb49838f`.
+The post-provision hook exports that commit to a temporary directory, applies the
+patch, and builds both images from the patched source. Patch or build failures stop
+deployment rather than silently falling back to the unfixed upstream app.
+
+To prepare the same source for local development or regression testing:
+
+```bash
+# Run from labs/starter-lab; use an empty directory outside the checkout.
+bash scripts/prepare-grubify-source.sh /tmp/grubify-fixed
+```
+
+The prepared source includes the checkout/cancellation tests and
+`scripts/verify-app.ps1` API regression check. The original submodule is unchanged.
+For immutable image tags, use the parent repository commit so the tag identifies
+both the upstream pin and the fixes.
 
 ## Quick Start
 

@@ -50,7 +50,7 @@ The Azure target and environment profile are conservative defaults inferred from
 - Add `https://github.com/dm-chelupati/grubify.git` as a Git submodule at `labs/starter-lab/src/grubify`, pinned to the reviewed upstream commit.
 - Add source provenance and CI checkout guidance near the starter lab documentation.
 - Use a submodule because the upstream repository does not publish a license file. Do not copy/vendor the upstream files into this repository unless the upstream owner confirms redistribution permission.
-- The existing `post-provision.sh` already detects this local path and builds both components from it.
+- App fixes are stored in `labs/starter-lab/patches/grubify-app-fixes.patch` in this repository. `post-provision.sh` exports upstream commit `6592accc6eef73e2d7c7339885386480cb49838f`, applies that patch in a temporary build directory, and builds both components from the patched source. No push to the upstream repository is required.
 
 ---
 

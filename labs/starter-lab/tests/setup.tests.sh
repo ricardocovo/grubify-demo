@@ -3,7 +3,8 @@ set -euo pipefail
 
 LAB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$(mktemp -d)"
-PYTHON_BIN="$(command -v python3)"
+PYTHON_BIN="${PYTHON_BIN:-$(command -v python3)}"
+GIT_BIN="$(command -v git)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 mkdir -p "$TMP_DIR/bin"
 
@@ -31,6 +32,26 @@ EOF
 
 cat > "$TMP_DIR/bin/az" <<'EOF'
 #!/usr/bin/env bash
+printf 'az %s\n' "$*" >> "$CALL_LOG"
+if [[ "$1 $2" == "acr show" ]]; then echo 'registry.test'; exit 0; fi
+if [[ "$1 $2" == "acr build" ]]; then
+  if [[ "${TEST_FAIL_BUILD:-false}" == true ]]; then exit 1; fi
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "--file" ]]; then shift; dockerfile="$1"; break; fi
+    shift
+  done
+  source_dir="$(dirname "$dockerfile")"
+  if [[ "$source_dir" == */GrubifyApi ]]; then
+    grep -q 'AddHealthChecks' "$source_dir/Program.cs" || exit 1
+    ! grep -q 'RequestDataCache' "$source_dir/Controllers/CartController.cs" || exit 1
+  else
+    grep -q 'customerPhone: deliveryInfo.phone' "$source_dir/src/pages/CheckoutPage.tsx" || exit 1
+    grep -q 'handleCancelOrder' "$source_dir/src/pages/OrderTrackingPage.tsx" || exit 1
+  fi
+  exit 0
+fi
+if [[ "$1 $2" == "containerapp show" ]]; then echo 'app.test'; exit 0; fi
+if [[ "$1 $2" == "containerapp update" ]]; then exit 0; fi
 if [[ "$1 $2" == "account get-access-token" ]]; then echo 'test-token'; exit 0; fi
 if [[ "$1 $2" == "account show" ]]; then echo 'test-subscription'; exit 0; fi
 if [[ "$1" == "rest" ]]; then
@@ -93,7 +114,10 @@ if [[ "$write_code" == true ]]; then printf '200'; fi
 EOF
 
 chmod +x "$TMP_DIR/bin/azd" "$TMP_DIR/bin/az" "$TMP_DIR/bin/curl" "$TMP_DIR/bin/sleep"
-ln -s "$PYTHON_BIN" "$TMP_DIR/bin/python3"
+printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$PYTHON_BIN" > "$TMP_DIR/bin/python3"
+chmod +x "$TMP_DIR/bin/python3"
+printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$GIT_BIN" > "$TMP_DIR/bin/git"
+chmod +x "$TMP_DIR/bin/git"
 
 run_scenario() {
   local github_user="$1"
@@ -120,10 +144,25 @@ fi
 grep -q 'Expected 4 knowledge sources, found 0' "$TMP_DIR/output-missing.txt"
 unset TEST_MISSING_KNOWLEDGE
 
+export CALL_LOG="$TMP_DIR/calls-build.log"
+PATH="$TMP_DIR/bin:/usr/bin:/bin" bash "$LAB_DIR/scripts/post-provision.sh" --build-only > "$TMP_DIR/output-build.txt"
+[[ "$(grep -c '^az acr build' "$CALL_LOG")" == 2 ]]
+grep -q 'Build & Deploy Complete' "$TMP_DIR/output-build.txt"
+
+export TEST_FAIL_BUILD=true
+export CALL_LOG="$TMP_DIR/calls-build-failure.log"
+if PATH="$TMP_DIR/bin:/usr/bin:/bin" bash "$LAB_DIR/scripts/post-provision.sh" --build-only > "$TMP_DIR/output-build-failure.txt" 2>&1; then
+  echo 'Expected image build failure to stop deployment' >&2
+  exit 1
+fi
+! grep -q '^az containerapp update' "$CALL_LOG"
+grep -q 'API image build failed' "$TMP_DIR/output-build-failure.txt"
+unset TEST_FAIL_BUILD
+
 ! grep -q 'api/v1/AgentMemory\|api/v1/incidentPlayground\|extendedAgent/connectors/github\|DataConnectors/github\|api/v1/github/config' "$LAB_DIR/scripts/post-provision.sh"
 grep -q '^hooks:' "$LAB_DIR/azure.yaml"
 grep -q 'postprovision:' "$LAB_DIR/azure.yaml"
 ! grep -q '^az login --use-device-code$\|^  azd auth login --use-device-code$' "$LAB_DIR/scripts/setup.sh"
 grep -q 'az account show' "$LAB_DIR/scripts/setup.sh"
 
-echo 'PASS: starter setup configures and verifies core and GitHub scenarios through current APIs'
+echo 'PASS: starter setup, patched image sources and fail-fast build checks'

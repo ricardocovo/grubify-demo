@@ -113,45 +113,44 @@ echo "📡 Agent: ${AGENT_ENDPOINT}"
 echo "📦 RG:    ${RESOURCE_GROUP}"
 echo ""
 
-# ── Step 0: Build & deploy Grubify via ACR (cloud-side, no local clone needed) ─
-GRUBIFY_REPO="https://github.com/dm-chelupati/grubify.git"
+# ── Step 0: Build & deploy the pinned Grubify source plus repository fixes ─
 
 if [ -n "$SKIP_BUILD" ]; then
   echo "🐳 Step 0/5: ⏭️  Skipped (--skip-build or --retry)"
 elif [ -n "$ACR_NAME" ]; then
   echo "🐳 Step 0/5: Building Grubify container images in ACR..."
-  ACR_LOGIN_SERVER=$(az acr show --name "$ACR_NAME" --query loginServer -o tsv 2>/dev/null)
+  GRUBIFY_BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/grubify-build.XXXXXXXX") || exit 1
+  trap 'rm -rf -- "$GRUBIFY_BUILD_DIR"' EXIT
+  if ! bash "$SCRIPT_DIR/prepare-grubify-source.sh" "$GRUBIFY_BUILD_DIR"; then
+    echo "ERROR: Unable to prepare patched Grubify source." >&2
+    exit 1
+  fi
+  ACR_LOGIN_SERVER=$(az acr show --name "$ACR_NAME" --query loginServer -o tsv) || exit 1
   IMAGE_TAG="${ACR_LOGIN_SERVER}/grubify-api:latest"
 
-  # Build from remote GitHub repo — no local clone needed
-  echo "   Building API image from GitHub repo (this takes ~1-2 min)..."
-  if [ -d "$PROJECT_DIR/src/grubify/GrubifyApi" ]; then
-    # Use local source if submodule is cloned
-    az acr build \
-      --registry "$ACR_NAME" \
-      --image "grubify-api:latest" \
-      --file "$PROJECT_DIR/src/grubify/GrubifyApi/Dockerfile" \
-      "$PROJECT_DIR/src/grubify/GrubifyApi" \
-      --no-logs --output none 2>/dev/null
-  else
-    # Build directly from GitHub — no local clone needed
-    az acr build \
-      --registry "$ACR_NAME" \
-      --image "grubify-api:latest" \
-      --file "Dockerfile" \
-      "${GRUBIFY_REPO}#main:GrubifyApi" \
-      --no-logs --output none 2>/dev/null
+  echo "   Building patched API image (this takes ~1-2 min)..."
+  if ! az acr build \
+    --registry "$ACR_NAME" \
+    --image "grubify-api:latest" \
+    --file "$GRUBIFY_BUILD_DIR/GrubifyApi/Dockerfile" \
+    "$GRUBIFY_BUILD_DIR/GrubifyApi" \
+    --no-logs --output none; then
+    echo "ERROR: API image build failed; deployment stopped." >&2
+    exit 1
   fi
 
   echo "   ✅ Built: ${IMAGE_TAG}"
 
   # Update the container app to use the new image
   echo "   Deploying API to container app..."
-  az containerapp update \
+  if ! az containerapp update \
     --name "$CONTAINER_APP_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --image "$IMAGE_TAG" \
-    --output none 2>/dev/null
+    --output none; then
+    echo "ERROR: API deployment failed." >&2
+    exit 1
+  fi
 
   # Refresh the app URL after update (retry if empty — Windows Git Bash can be slow)
   FQDN=""
@@ -175,30 +174,27 @@ elif [ -n "$ACR_NAME" ]; then
   # Build and deploy frontend
   echo "   Building frontend image (this takes ~2-3 min)..."
   FRONTEND_IMAGE="${ACR_LOGIN_SERVER}/grubify-frontend:latest"
-  if [ -d "$PROJECT_DIR/src/grubify/grubify-frontend" ]; then
-    az acr build \
-      --registry "$ACR_NAME" \
-      --image "grubify-frontend:latest" \
-      --file "$PROJECT_DIR/src/grubify/grubify-frontend/Dockerfile" \
-      "$PROJECT_DIR/src/grubify/grubify-frontend" \
-      --no-logs --output none 2>/dev/null
-  else
-    az acr build \
-      --registry "$ACR_NAME" \
-      --image "grubify-frontend:latest" \
-      --file "Dockerfile" \
-      "${GRUBIFY_REPO}#main:grubify-frontend" \
-      --no-logs --output none 2>/dev/null
+  if ! az acr build \
+    --registry "$ACR_NAME" \
+    --image "grubify-frontend:latest" \
+    --file "$GRUBIFY_BUILD_DIR/grubify-frontend/Dockerfile" \
+    "$GRUBIFY_BUILD_DIR/grubify-frontend" \
+    --no-logs --output none; then
+    echo "ERROR: Frontend image build failed; deployment stopped." >&2
+    exit 1
   fi
 
   echo "   ✅ Frontend built"
   echo "   Deploying frontend to container app..."
-  az containerapp update \
+  if ! az containerapp update \
     --name "$FRONTEND_APP_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --image "$FRONTEND_IMAGE" \
     --set-env-vars "REACT_APP_API_BASE_URL=https://${CONTAINER_APP_URL#https://}/api" \
-    --output none 2>/dev/null
+    --output none; then
+    echo "ERROR: Frontend deployment failed." >&2
+    exit 1
+  fi
 
   FE_FQDN=""
   for i in 1 2 3; do

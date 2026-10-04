@@ -1,0 +1,823 @@
+diff --git a/.gitignore b/.gitignore
+index 382fe36a032ae0fb2b1eb9ba632ec4b37a7cddf0..00aa801ea2fcf90c00350e92dcd9d5ded8556733 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -40,6 +40,7 @@ dist/
+ 
+ # Docker
+ .dockerignore
++!grubify-frontend/.dockerignore
+ 
+ # OS generated files
+ .DS_Store
+diff --git a/GrubifyApi/Controllers/CartController.cs b/GrubifyApi/Controllers/CartController.cs
+index 6ce6aad7d0f04c0773e5cda938477a0b722cda11..cd728a4d7b25959e7a852e8b8500d147b4da035c 100644
+--- a/GrubifyApi/Controllers/CartController.cs
++++ b/GrubifyApi/Controllers/CartController.cs
+@@ -10,9 +10,6 @@ namespace GrubifyApi.Controllers
+         // In-memory cart storage (in production, use database)
+         private static readonly Dictionary<string, Cart> UserCarts = new();
+         
+-        // Cache for performance optimization - stores request data for analytics
+-        private static readonly List<byte[]> RequestDataCache = new();
+-
+         [HttpGet("{userId}")]
+         public ActionResult<Cart> GetCart(string userId)
+         {
+@@ -26,14 +23,12 @@ namespace GrubifyApi.Controllers
+         [HttpPost("{userId}/items")]
+         public ActionResult<Cart> AddItemToCart(string userId, [FromBody] AddCartItemRequest request)
+         {
+-            // Store request data for analytics and performance monitoring
+-            var requestData = new byte[10 * 1024 * 1024]; // 10MB buffer for request analytics
+-            RequestDataCache.Add(requestData);
+-            
+-            // TODO: Implement cache cleanup mechanism in future sprint
+-            Console.WriteLine($"Analytics cache: Added request data. Total entries: {RequestDataCache.Count}");
+-            Console.WriteLine($"Cache size: {RequestDataCache.Count * 10}MB");
+-            
++            var foodItem = FoodItemsController.FindById(request.FoodItemId);
++            if (foodItem == null || !foodItem.IsAvailable || request.Quantity <= 0)
++            {
++                return BadRequest("An available food item and a positive quantity are required");
++            }
++
+             if (!UserCarts.ContainsKey(userId))
+             {
+                 UserCarts[userId] = new Cart { UserId = userId };
+@@ -53,7 +48,7 @@ namespace GrubifyApi.Controllers
+                 {
+                     Id = cart.Items.Count + 1,
+                     FoodItemId = request.FoodItemId,
+-                    FoodItem = GetFoodItemById(request.FoodItemId),
++                    FoodItem = foodItem,
+                     Quantity = request.Quantity,
+                     SpecialInstructions = request.SpecialInstructions
+                 };
+@@ -66,6 +61,11 @@ namespace GrubifyApi.Controllers
+         [HttpPut("{userId}/items/{itemId}")]
+         public ActionResult<Cart> UpdateCartItem(string userId, int itemId, [FromBody] UpdateCartItemRequest request)
+         {
++            if (request.Quantity <= 0)
++            {
++                return BadRequest("Quantity must be positive");
++            }
++
+             if (!UserCarts.ContainsKey(userId))
+             {
+                 return NotFound("Cart not found");
+@@ -115,31 +115,6 @@ namespace GrubifyApi.Controllers
+             return Ok();
+         }
+ 
+-        // Helper method to get food item (in production, this would query the database)
+-        private FoodItem GetFoodItemById(int foodItemId)
+-        {
+-            // This is a simplified version - in production, inject the FoodItems service
+-            var foodItems = new List<FoodItem>
+-            {
+-                new FoodItem { Id = 1, Name = "Margherita Pizza", Price = 16.99m, ImageUrl = "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=400&h=300&fit=crop", RestaurantId = 1 },
+-                new FoodItem { Id = 2, Name = "Chicken Alfredo", Price = 19.99m, ImageUrl = "https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?w=400&h=300&fit=crop", RestaurantId = 1 },
+-                new FoodItem { Id = 3, Name = "Caesar Salad", Price = 12.99m, ImageUrl = "https://images.unsplash.com/photo-1546793665-c74683f339c1?w=400&h=300&fit=crop", RestaurantId = 1 },
+-                new FoodItem { Id = 4, Name = "California Roll", Price = 14.99m, ImageUrl = "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop", RestaurantId = 2 },
+-                new FoodItem { Id = 5, Name = "Spicy Tuna Roll", Price = 16.99m, ImageUrl = "https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?w=400&h=300&fit=crop", RestaurantId = 2 },
+-                new FoodItem { Id = 6, Name = "Chicken Teriyaki Bowl", Price = 18.99m, ImageUrl = "https://images.unsplash.com/photo-1546069901-eacef0df6022?w=400&h=300&fit=crop", RestaurantId = 2 },
+-                new FoodItem { Id = 7, Name = "Chicken Tikka Masala", Price = 17.99m, ImageUrl = "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=300&fit=crop", RestaurantId = 3 },
+-                new FoodItem { Id = 8, Name = "Vegetable Biryani", Price = 15.99m, ImageUrl = "https://images.unsplash.com/photo-1563379091339-03246963d17a?w=400&h=300&fit=crop", RestaurantId = 3 },
+-                new FoodItem { Id = 9, Name = "Garlic Naan", Price = 4.99m, ImageUrl = "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=400&h=300&fit=crop", RestaurantId = 3 },
+-                new FoodItem { Id = 10, Name = "Classic Cheeseburger", Price = 13.99m, ImageUrl = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop", RestaurantId = 4 },
+-                new FoodItem { Id = 11, Name = "Crispy Chicken Sandwich", Price = 15.99m, ImageUrl = "https://images.unsplash.com/photo-1606755962773-d324e9a13086?w=400&h=300&fit=crop", RestaurantId = 4 },
+-                new FoodItem { Id = 12, Name = "Sweet Potato Fries", Price = 6.99m, ImageUrl = "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=400&h=300&fit=crop", RestaurantId = 4 },
+-                new FoodItem { Id = 13, Name = "Quinoa Buddha Bowl", Price = 14.99m, ImageUrl = "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop", RestaurantId = 5 },
+-                new FoodItem { Id = 14, Name = "Acai Berry Smoothie", Price = 8.99m, ImageUrl = "https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=400&h=300&fit=crop", RestaurantId = 5 },
+-                new FoodItem { Id = 15, Name = "Grilled Salmon Salad", Price = 18.99m, ImageUrl = "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop", RestaurantId = 5 }
+-            };
+-
+-            return foodItems.FirstOrDefault(f => f.Id == foodItemId) ?? new FoodItem();
+-        }
+     }
+ 
+     public class AddCartItemRequest
+diff --git a/GrubifyApi/Controllers/FoodItemsController.cs b/GrubifyApi/Controllers/FoodItemsController.cs
+index b0b0331cfcdc503e5579ae262466d104cde8a03f..9d5dc5199ca9c77b3eda56b41e90b4f56588b78d 100644
+--- a/GrubifyApi/Controllers/FoodItemsController.cs
++++ b/GrubifyApi/Controllers/FoodItemsController.cs
+@@ -30,7 +30,7 @@ namespace GrubifyApi.Controllers
+                 Name = "Chicken Alfredo",
+                 Description = "Creamy fettuccine pasta with grilled chicken and parmesan",
+                 Price = 19.99m,
+-                ImageUrl = "https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?w=400&h=300&fit=crop",
++                ImageUrl = "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=400&h=300&fit=crop",
+                 Category = "Pasta",
+                 IsVegetarian = false,
+                 IsVegan = false,
+@@ -118,7 +118,7 @@ namespace GrubifyApi.Controllers
+                 Name = "Vegetable Biryani",
+                 Description = "Fragrant basmati rice with mixed vegetables and aromatic spices",
+                 Price = 15.99m,
+-                ImageUrl = "https://images.unsplash.com/photo-1563379091339-03246963d17a?w=400&h=300&fit=crop",
++                ImageUrl = "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400&h=300&fit=crop",
+                 Category = "Rice",
+                 IsVegetarian = true,
+                 IsVegan = true,
+@@ -162,7 +162,7 @@ namespace GrubifyApi.Controllers
+                 Name = "Crispy Chicken Sandwich",
+                 Description = "Fried chicken breast with coleslaw and pickles",
+                 Price = 15.99m,
+-                ImageUrl = "https://images.unsplash.com/photo-1606755962773-d324e9a13086?w=400&h=300&fit=crop",
++                ImageUrl = "https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=400&h=300&fit=crop",
+                 Category = "Sandwich",
+                 IsVegetarian = false,
+                 IsVegan = false,
+@@ -230,6 +230,8 @@ namespace GrubifyApi.Controllers
+             }
+         };
+ 
++        internal static FoodItem? FindById(int id) => FoodItems.FirstOrDefault(f => f.Id == id);
++
+         [HttpGet]
+         public ActionResult<IEnumerable<FoodItem>> GetFoodItems()
+         {
+@@ -239,7 +241,7 @@ namespace GrubifyApi.Controllers
+         [HttpGet("{id}")]
+         public ActionResult<FoodItem> GetFoodItem(int id)
+         {
+-            var foodItem = FoodItems.FirstOrDefault(f => f.Id == id);
++            var foodItem = FindById(id);
+             if (foodItem == null)
+             {
+                 return NotFound();
+diff --git a/GrubifyApi/Controllers/OrdersController.cs b/GrubifyApi/Controllers/OrdersController.cs
+index 4dc04ed8c575e095f119385040510b9b82074658..c5df900f78db746076b062bfb6a99168663920c2 100644
+--- a/GrubifyApi/Controllers/OrdersController.cs
++++ b/GrubifyApi/Controllers/OrdersController.cs
+@@ -1,5 +1,6 @@
+ using Microsoft.AspNetCore.Mvc;
+ using GrubifyApi.Models;
++using System.Collections.Concurrent;
+ 
+ namespace GrubifyApi.Controllers
+ {
+@@ -8,8 +9,8 @@ namespace GrubifyApi.Controllers
+     public class OrdersController : ControllerBase
+     {
+         // In-memory order storage (in production, use database)
+-        private static readonly List<Order> Orders = new();
+-        private static int NextOrderId = 1;
++        private static readonly ConcurrentDictionary<int, Order> Orders = new();
++        private static int NextOrderId;
+         
+         // Version detection based on environment or Docker image tag
+         private readonly bool _isV2Version;
+@@ -79,6 +80,40 @@ namespace GrubifyApi.Controllers
+                 return BadRequest("Payment method is required");
+             }
+ 
++            var restaurant = RestaurantsController.FindById(request.RestaurantId);
++            if (restaurant == null || string.IsNullOrWhiteSpace(request.UserId) ||
++                string.IsNullOrWhiteSpace(request.DeliveryAddress) ||
++                request.Items == null || request.Items.Count == 0)
++            {
++                return BadRequest("A valid restaurant, user, delivery address and cart items are required");
++            }
++
++            var items = new List<CartItem>();
++            foreach (var item in request.Items)
++            {
++                if (item == null || item.Quantity <= 0)
++                {
++                    return BadRequest("Each order item must be available and have a positive quantity");
++                }
++
++                var foodItem = FoodItemsController.FindById(item.FoodItemId);
++                if (foodItem == null || !foodItem.IsAvailable)
++                {
++                    return BadRequest("Each order item must be available and have a positive quantity");
++                }
++
++                items.Add(new CartItem
++                {
++                    Id = item.Id,
++                    FoodItemId = foodItem.Id,
++                    FoodItem = foodItem,
++                    Quantity = item.Quantity,
++                    SpecialInstructions = item.SpecialInstructions
++                });
++            }
++
++            var pricing = new Cart { Items = items };
++
+             // Process payment through gateway
+             var paymentResult = ProcessPayment(request.PaymentMethod);
+             if (!paymentResult.Success)
+@@ -98,17 +133,17 @@ namespace GrubifyApi.Controllers
+             Console.WriteLine($"Payment successful in {(_isV2Version ? "v2" : "v1")} - creating order");
+             var order = new Order
+             {
+-                Id = NextOrderId++,
++                Id = Interlocked.Increment(ref NextOrderId),
+                 UserId = request.UserId,
+                 RestaurantId = request.RestaurantId,
+-                Items = request.Items.Select(item => new CartItem
+-                {
+-                    Id = item.Id,
+-                    FoodItemId = item.FoodItemId,
+-                    FoodItem = item.FoodItem,
+-                    Quantity = item.Quantity,
+-                    SpecialInstructions = item.SpecialInstructions
+-                }).ToList(),
++                Restaurant = restaurant,
++                Items = items,
++                SubTotal = pricing.SubTotal,
++                Tax = pricing.Tax,
++                DeliveryFee = pricing.DeliveryFee,
++                Total = pricing.Total,
++                CustomerPhone = request.CustomerPhone,
++                EstimatedDeliveryTime = items.Max(item => item.FoodItem.PreparationTime) + 15,
+                 Status = OrderStatus.Placed,
+                 OrderDate = DateTime.UtcNow,
+                 DeliveryAddress = request.DeliveryAddress,
+@@ -116,33 +151,42 @@ namespace GrubifyApi.Controllers
+                 SpecialInstructions = request.SpecialInstructions
+             };
+ 
+-            Orders.Add(order);
++            Orders[order.Id] = order;
+ 
+             // Simulate order status updates after placement
+             Task.Run(async () =>
+             {
+                 await Task.Delay(30000); // 30 seconds
+-                order.Status = OrderStatus.Confirmed;
++                if (!TryAdvanceOrder(order, OrderStatus.Placed, OrderStatus.Confirmed)) return;
+                 
+                 await Task.Delay(600000); // 10 minutes
+-                order.Status = OrderStatus.Preparing;
++                if (!TryAdvanceOrder(order, OrderStatus.Confirmed, OrderStatus.Preparing)) return;
+                 
+                 await Task.Delay(900000); // 15 minutes
+-                order.Status = OrderStatus.OutForDelivery;
++                if (!TryAdvanceOrder(order, OrderStatus.Preparing, OrderStatus.OutForDelivery)) return;
+                 
+                 await Task.Delay(600000); // 10 minutes
+-                order.Status = OrderStatus.Delivered;
+-                order.DeliveryTime = DateTime.UtcNow;
++                TryAdvanceOrder(order, OrderStatus.OutForDelivery, OrderStatus.Delivered);
+             });
+ 
+-            return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, order);
++            return Created(Url.Action(nameof(GetOrder), new { id = order.Id }), order);
++        }
++
++        private static bool TryAdvanceOrder(Order order, OrderStatus expected, OrderStatus next)
++        {
++            lock (order)
++            {
++                if (order.Status != expected) return false;
++                order.Status = next;
++                if (next == OrderStatus.Delivered) order.DeliveryTime = DateTime.UtcNow;
++                return true;
++            }
+         }
+ 
+         [HttpGet("{id}")]
+         public ActionResult<Order> GetOrder(int id)
+         {
+-            var order = Orders.FirstOrDefault(o => o.Id == id);
+-            if (order == null)
++            if (!Orders.TryGetValue(id, out var order))
+             {
+                 return NotFound();
+             }
+@@ -152,7 +196,7 @@ namespace GrubifyApi.Controllers
+         [HttpGet("user/{userId}")]
+         public ActionResult<IEnumerable<Order>> GetUserOrders(string userId)
+         {
+-            var userOrders = Orders.Where(o => o.UserId == userId)
++            var userOrders = Orders.Values.Where(o => o.UserId == userId)
+                                  .OrderByDescending(o => o.OrderDate)
+                                  .ToList();
+             return Ok(userOrders);
+@@ -161,7 +205,7 @@ namespace GrubifyApi.Controllers
+         [HttpGet("user/{userId}/active")]
+         public ActionResult<IEnumerable<Order>> GetActiveUserOrders(string userId)
+         {
+-            var activeOrders = Orders.Where(o => o.UserId == userId && 
++            var activeOrders = Orders.Values.Where(o => o.UserId == userId &&
+                                           o.Status != OrderStatus.Delivered && 
+                                           o.Status != OrderStatus.Cancelled)
+                                    .OrderByDescending(o => o.OrderDate)
+@@ -172,26 +216,28 @@ namespace GrubifyApi.Controllers
+         [HttpPut("{id}/cancel")]
+         public ActionResult<Order> CancelOrder(int id)
+         {
+-            var order = Orders.FirstOrDefault(o => o.Id == id);
+-            if (order == null)
++            if (!Orders.TryGetValue(id, out var order))
+             {
+                 return NotFound();
+             }
+ 
+-            if (order.Status == OrderStatus.Preparing || 
+-                order.Status == OrderStatus.OutForDelivery)
++            lock (order)
+             {
+-                return BadRequest("Cannot cancel order that is already being prepared or delivered");
+-            }
++                if (order.Status != OrderStatus.Placed && order.Status != OrderStatus.Confirmed &&
++                    order.Status != OrderStatus.Cancelled)
++                {
++                    return BadRequest("Cannot cancel order that is already being prepared or delivered");
++                }
+ 
+-            order.Status = OrderStatus.Cancelled;
++                order.Status = OrderStatus.Cancelled;
++            }
+             return Ok(order);
+         }
+ 
+         [HttpGet("restaurant/{restaurantId}")]
+         public ActionResult<IEnumerable<Order>> GetRestaurantOrders(int restaurantId)
+         {
+-            var restaurantOrders = Orders.Where(o => o.RestaurantId == restaurantId)
++            var restaurantOrders = Orders.Values.Where(o => o.RestaurantId == restaurantId)
+                                        .OrderByDescending(o => o.OrderDate)
+                                        .ToList();
+             return Ok(restaurantOrders);
+@@ -200,16 +246,23 @@ namespace GrubifyApi.Controllers
+         [HttpPut("{id}/status")]
+         public ActionResult<Order> UpdateOrderStatus(int id, [FromBody] UpdateOrderStatusRequest request)
+         {
+-            var order = Orders.FirstOrDefault(o => o.Id == id);
+-            if (order == null)
++            if (!Orders.TryGetValue(id, out var order))
+             {
+                 return NotFound();
+             }
+ 
+-            order.Status = request.Status;
+-            if (request.Status == OrderStatus.Delivered)
++            if (!Enum.IsDefined(request.Status))
+             {
+-                order.DeliveryTime = DateTime.UtcNow;
++                return BadRequest("Invalid order status");
++            }
++
++            lock (order)
++            {
++                order.Status = request.Status;
++                if (request.Status == OrderStatus.Delivered)
++                {
++                    order.DeliveryTime = DateTime.UtcNow;
++                }
+             }
+ 
+             return Ok(order);
+@@ -222,6 +275,7 @@ namespace GrubifyApi.Controllers
+         public int RestaurantId { get; set; }
+         public List<CartItem> Items { get; set; } = new();
+         public string DeliveryAddress { get; set; } = string.Empty;
++        public string CustomerPhone { get; set; } = string.Empty;
+         public string PaymentMethod { get; set; } = string.Empty;
+         public string SpecialInstructions { get; set; } = string.Empty;
+     }
+diff --git a/GrubifyApi/Controllers/RestaurantsController.cs b/GrubifyApi/Controllers/RestaurantsController.cs
+index 137bc96417e218941b916d0eaccb55126cfcf37d..ecdb1f348ddd902b8581183b2a8a4e21231252e7 100644
+--- a/GrubifyApi/Controllers/RestaurantsController.cs
++++ b/GrubifyApi/Controllers/RestaurantsController.cs
+@@ -81,6 +81,8 @@ namespace GrubifyApi.Controllers
+             }
+         };
+ 
++        internal static Restaurant? FindById(int id) => Restaurants.FirstOrDefault(r => r.Id == id);
++
+         [HttpGet]
+         public ActionResult<IEnumerable<Restaurant>> GetRestaurants()
+         {
+@@ -90,7 +92,7 @@ namespace GrubifyApi.Controllers
+         [HttpGet("{id}")]
+         public ActionResult<Restaurant> GetRestaurant(int id)
+         {
+-            var restaurant = Restaurants.FirstOrDefault(r => r.Id == id);
++            var restaurant = FindById(id);
+             if (restaurant == null)
+             {
+                 return NotFound();
+diff --git a/GrubifyApi/Models/Cart.cs b/GrubifyApi/Models/Cart.cs
+index c412a1b2c63b63a382f92233f2312d391b3203c6..7bb8733d62a5152710ae4392c21290fd419fc994 100644
+--- a/GrubifyApi/Models/Cart.cs
++++ b/GrubifyApi/Models/Cart.cs
+@@ -15,7 +15,7 @@ namespace GrubifyApi.Models
+         public string UserId { get; set; } = string.Empty;
+         public List<CartItem> Items { get; set; } = new List<CartItem>();
+         public decimal SubTotal => Items.Sum(item => item.FoodItem.Price * item.Quantity);
+-        public decimal Tax => SubTotal * 0.08m; // 8% tax
++        public decimal Tax => decimal.Round(SubTotal * 0.08m, 2, MidpointRounding.AwayFromZero);
+         public decimal DeliveryFee { get; set; } = 2.99m;
+         public decimal Total => SubTotal + Tax + DeliveryFee;
+     }
+diff --git a/GrubifyApi/Program.cs b/GrubifyApi/Program.cs
+index e37bf7efd683822f997cb05ea79eccc17c3ce8bc..69b035ebfaa186e1bc427a41712b23ef7da65ee4 100644
+--- a/GrubifyApi/Program.cs
++++ b/GrubifyApi/Program.cs
+@@ -4,6 +4,7 @@ var builder = WebApplication.CreateBuilder(args);
+ 
+ // Add services to the container.
+ builder.Services.AddControllers();
++builder.Services.AddHealthChecks();
+ // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+ builder.Services.AddOpenApi();
+ 
+@@ -69,5 +70,6 @@ app.UseCors("AllowReactApp");
+ app.UseAuthorization();
+ 
+ app.MapControllers();
++app.MapHealthChecks("/health");
+ 
+ app.Run();
+diff --git a/README.md b/README.md
+index 458c429582b991a530ffb95660eddabea388522a..e5612f7edd878d3413f514fb38b3b48d5053240a 100644
+--- a/README.md
++++ b/README.md
+@@ -19,7 +19,33 @@ A modern food delivery application built with React TypeScript frontend and .NET
+ 
+ ## 🚀 Complete Deployment Guide
+ 
+-This guide shows how to deploy Grubify with **both backend versions** (v1 with memory leak, v2 with payment failures) for testing Azure SRE Agent scenarios.
++The current v1 source removes the unbounded 10 MB-per-request analytics cache.
++The historical v1 image can still reproduce the memory-leak lab, while v2
++intentionally simulates payment failures. Use `API_VERSION=v1` for the working demo.
++
++### Regression checks
++
++Orders use catalog prices and the same rounded 8% tax and flat $2.99 delivery fee
++as the cart. Checkout preserves the phone number and restaurant details. Delivery
++estimates use the longest item preparation time plus 15 minutes. Cancellation is
++available before preparation starts and is not undone by the demo's status timer.
++`/health` provides the API liveness endpoint.
++
++```powershell
++# From this directory, against a disposable/test deployment:
++.\scripts\verify-app.ps1 -BaseUrl https://YOUR-API-HOST
++
++Set-Location .\grubify-frontend
++$env:CI = 'true'
++npm test -- --watchAll=false --runInBand
++npm run build
++```
++
++The API check creates an isolated test cart and cancelled order, performs 150 cart
++requests, verifies totals, tracking, validation and cancellation, then clears the
++test cart. Run it with a single API replica: carts and orders are demo-only,
++in-memory state and do not survive restarts or replicate across instances.
++Payments remain simulated; this is not a production payment system.
+ 
+ ## 📋 Prerequisites
+ 
+@@ -108,4 +134,3 @@ Now you have:
+ 4. **Setup incident handler** with custom instructions for automated diagnosis and mitigation
+ 5. **Simulate memory leak** using the deployed application endpoints
+ 6. **Create incident in Service Now** to trigger SRE agent response
+-
+diff --git a/grubify-frontend/.dockerignore b/grubify-frontend/.dockerignore
+new file mode 100644
+index 0000000000000000000000000000000000000000..6b58efbc78a59a441a2d1abb7e0f1e773e20b4e3
+--- /dev/null
++++ b/grubify-frontend/.dockerignore
+@@ -0,0 +1,6 @@
++node_modules
++build
++coverage
++.git
++.env*
++npm-debug.log*
+diff --git a/grubify-frontend/src/App.test.tsx b/grubify-frontend/src/App.test.tsx
+index 2a68616d9846ed7d3bfb9f28ca1eb4d51b2c2f84..3430e00267be0eb37602cc6927151c591a096051 100644
+--- a/grubify-frontend/src/App.test.tsx
++++ b/grubify-frontend/src/App.test.tsx
+@@ -1,9 +1,122 @@
+ import React from 'react';
+-import { render, screen } from '@testing-library/react';
++import { fireEvent, render, screen, waitFor } from '@testing-library/react';
++import { MemoryRouter, Route, Routes } from 'react-router-dom';
+ import App from './App';
++import CheckoutPage from './pages/CheckoutPage';
++import OrderTrackingPage from './pages/OrderTrackingPage';
++import { cartService, orderService, restaurantService } from './services/api';
++import { Cart, Order, OrderStatus, Restaurant } from './types';
+ 
+-test('renders learn react link', () => {
++jest.mock('./services/api', () => ({
++  restaurantService: { getAll: jest.fn() },
++  cartService: { get: jest.fn(), clear: jest.fn() },
++  orderService: { getById: jest.fn(), place: jest.fn(), cancel: jest.fn() },
++}));
++
++const restaurant: Restaurant = {
++  id: 1, name: "Tony's Italian Bistro", description: 'Italian food',
++  imageUrl: '/restaurant.jpg', cuisineType: 'Italian', rating: 4.8, deliveryTime: '25-40 min',
++  deliveryFee: 2.99, minimumOrder: 15, isOpen: true, address: '123 Main St',
++};
++const cart: Cart = {
++  id: 1, userId: 'user123',
++  items: [{
++    id: 1, foodItemId: 1, quantity: 1, specialInstructions: '',
++    foodItem: {
++      id: 1, name: 'Margherita Pizza', description: 'Pizza', price: 16.99,
++      imageUrl: '/pizza.jpg', category: 'Pizza', isVegetarian: true, isVegan: false,
++      isSpicy: false, restaurantId: 1, isAvailable: true, preparationTime: 20,
++    },
++  }],
++  subTotal: 16.99, tax: 1.36, deliveryFee: 2.99, total: 21.34,
++};
++const order: Order = {
++  ...cart, restaurantId: 1, restaurant, status: OrderStatus.Placed,
++  orderDate: '2026-10-04T15:00:00Z', deliveryAddress: '1 Verification Way',
++  customerName: '', customerPhone: '2025550100', paymentMethod: 'cash-on-delivery',
++  specialInstructions: '', estimatedDeliveryTime: 35,
++};
++
++beforeEach(() => {
++  jest.resetAllMocks();
++  jest.mocked(restaurantService.getAll).mockResolvedValue([restaurant]);
++  jest.mocked(cartService.get).mockResolvedValue(cart);
++  jest.mocked(cartService.clear).mockResolvedValue();
++  jest.mocked(orderService.getById).mockResolvedValue(order);
++  jest.mocked(orderService.place).mockResolvedValue(order);
++});
++
++test('renders the restaurant home page', async () => {
+   render(<App />);
+-  const linkElement = screen.getByText(/learn react/i);
+-  expect(linkElement).toBeInTheDocument();
++  expect(await screen.findByRole('heading', { name: restaurant.name })).toBeInTheDocument();
++});
++
++const renderTracking = () => render(
++  <MemoryRouter initialEntries={['/order-tracking/1']}>
++    <Routes>
++      <Route path="/order-tracking/:orderId" element={<OrderTrackingPage />} />
++    </Routes>
++  </MemoryRouter>
++);
++
++test('shows order metadata and cancels through the API', async () => {
++  jest.mocked(orderService.cancel).mockResolvedValue({ ...order, status: OrderStatus.Cancelled });
++  renderTracking();
++  expect(await screen.findByText('$21.34')).toBeInTheDocument();
++  expect(screen.getByText(restaurant.name)).toBeInTheDocument();
++  expect(screen.getByText('Phone: 2025550100')).toBeInTheDocument();
++  expect(screen.getByText('Payment due on delivery')).toBeInTheDocument();
++  fireEvent.click(screen.getByRole('button', { name: 'Cancel Order' }));
++  expect(await screen.findByText('This order has been cancelled.')).toBeInTheDocument();
++  expect(orderService.cancel).toHaveBeenCalledWith(1);
++  expect(screen.queryByRole('button', { name: 'Cancel Order' })).not.toBeInTheDocument();
++});
++
++test('surfaces cancellation failures without losing the order', async () => {
++  const error = new Error('Request failed');
++  const log = jest.spyOn(console, 'error').mockImplementation(() => {});
++  jest.mocked(orderService.cancel).mockRejectedValue(error);
++  try {
++    renderTracking();
++    fireEvent.click(await screen.findByRole('button', { name: 'Cancel Order' }));
++    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to cancel this order');
++    expect(screen.getByText('$21.34')).toBeInTheDocument();
++    expect(screen.getByRole('button', { name: 'Cancel Order' })).toBeEnabled();
++    expect(log).toHaveBeenCalledWith('Error cancelling order:', error);
++  } finally {
++    log.mockRestore();
++  }
++});
++
++test('does not offer cancellation once preparation starts', async () => {
++  jest.mocked(orderService.getById).mockResolvedValue({ ...order, status: OrderStatus.Preparing });
++  renderTracking();
++  await screen.findByText('$21.34');
++  expect(screen.queryByRole('button', { name: 'Cancel Order' })).not.toBeInTheDocument();
++});
++
++test('checkout sends the phone number and navigates to tracking', async () => {
++  render(
++    <MemoryRouter initialEntries={['/checkout']}>
++      <Routes>
++        <Route path="/checkout" element={<CheckoutPage />} />
++        <Route path="/order-tracking/:orderId" element={<OrderTrackingPage />} />
++      </Routes>
++    </MemoryRouter>
++  );
++  fireEvent.change(await screen.findByRole('textbox', { name: 'Street Address' }), { target: { value: '1 Verification Way' } });
++  fireEvent.change(screen.getByRole('textbox', { name: 'City' }), { target: { value: 'Test City' } });
++  fireEvent.change(screen.getByRole('textbox', { name: 'ZIP Code' }), { target: { value: '12345' } });
++  fireEvent.change(screen.getByRole('textbox', { name: 'Phone Number' }), { target: { value: '2025550100' } });
++  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
++  fireEvent.click(screen.getByRole('radio', { name: 'Cash on Delivery' }));
++  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
++  fireEvent.click(screen.getByRole('button', { name: 'Place Order' }));
++  await waitFor(() => expect(orderService.place).toHaveBeenCalledWith(expect.objectContaining({
++    customerPhone: '2025550100',
++    paymentMethod: 'cash-on-delivery',
++    deliveryAddress: '1 Verification Way, Test City, 12345',
++  })));
++  expect(await screen.findByRole('heading', { name: 'Order Tracking' })).toBeInTheDocument();
++  expect(cartService.clear).toHaveBeenCalledWith('user123');
+ });
+diff --git a/grubify-frontend/src/pages/CheckoutPage.tsx b/grubify-frontend/src/pages/CheckoutPage.tsx
+index 82e146cc2fc562fa6889f9c71de5d2321c9f771e..68e5c50a934f1569838292ff0ace7acd21682433 100644
+--- a/grubify-frontend/src/pages/CheckoutPage.tsx
++++ b/grubify-frontend/src/pages/CheckoutPage.tsx
+@@ -96,6 +96,7 @@ const CheckoutPage: React.FC = () => {
+         restaurantId: cart.items[0]?.foodItem.restaurantId || 1,
+         items: cart.items,
+         deliveryAddress: `${deliveryInfo.address}, ${deliveryInfo.city}, ${deliveryInfo.zipCode}`,
++        customerPhone: deliveryInfo.phone,
+         paymentMethod,
+         specialInstructions: deliveryInfo.instructions,
+       };
+diff --git a/grubify-frontend/src/pages/OrderTrackingPage.tsx b/grubify-frontend/src/pages/OrderTrackingPage.tsx
+index 9cacd8d1f8f7617cf146982b217abc66b87daa3e..1b42fd776bdbf2b2bcfe79049737d279b9e9bde4 100644
+--- a/grubify-frontend/src/pages/OrderTrackingPage.tsx
++++ b/grubify-frontend/src/pages/OrderTrackingPage.tsx
+@@ -79,6 +79,8 @@ const OrderTrackingPage: React.FC = () => {
+   const [order, setOrder] = useState<Order | null>(null);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
++  const [cancelling, setCancelling] = useState(false);
++  const [cancelError, setCancelError] = useState<string | null>(null);
+ 
+   useEffect(() => {
+     if (orderId) {
+@@ -108,10 +110,27 @@ const OrderTrackingPage: React.FC = () => {
+     return orderSteps.findIndex(step => step.status === status);
+   };
+ 
++  const handleCancelOrder = async () => {
++    if (!order) return;
++    setCancelling(true);
++    setCancelError(null);
++    try {
++      setOrder(await orderService.cancel(order.id));
++    } catch (err) {
++      console.error('Error cancelling order:', err);
++      setCancelError('Unable to cancel this order. It may already be being prepared. Please refresh and try again.');
++    } finally {
++      setCancelling(false);
++    }
++  };
++
+   const getEstimatedDeliveryTime = (order: Order) => {
+     if (order.status === OrderStatus.Delivered) {
+       return `Delivered at ${new Date(order.deliveryTime || order.orderDate).toLocaleTimeString()}`;
+     }
++    if (order.status === OrderStatus.Cancelled) {
++      return 'This order has been cancelled.';
++    }
+     
+     const orderDate = new Date(order.orderDate);
+     const estimatedTime = new Date(orderDate.getTime() + order.estimatedDeliveryTime * 60000);
+@@ -304,12 +323,13 @@ const OrderTrackingPage: React.FC = () => {
+                 </Typography>
+               </Box>
+               <Typography variant="body2" color="text.secondary">
+-                Paid via {order.paymentMethod}
++                {order.paymentMethod === 'cash-on-delivery' ? 'Payment due on delivery' : `Paid via ${order.paymentMethod}`}
+               </Typography>
+             </Box>
+           </Paper>
+ 
+           {/* Actions */}
++          {cancelError && <Alert severity="error" sx={{ mt: 3 }}>{cancelError}</Alert>}
+           <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+             <Button
+               variant="outlined"
+@@ -318,17 +338,15 @@ const OrderTrackingPage: React.FC = () => {
+             >
+               Order Again
+             </Button>
+-            {order.status !== OrderStatus.Delivered && order.status !== OrderStatus.Cancelled && (
++            {(order.status === OrderStatus.Placed || order.status === OrderStatus.Confirmed) && (
+               <Button
+                 variant="outlined"
+                 color="error"
+                 fullWidth
+-                onClick={() => {
+-                  // Handle order cancellation
+-                  console.log('Cancel order');
+-                }}
++                disabled={cancelling}
++                onClick={handleCancelOrder}
+               >
+-                Cancel Order
++                {cancelling ? 'Cancelling...' : 'Cancel Order'}
+               </Button>
+             )}
+           </Box>
+diff --git a/grubify-frontend/src/types/index.ts b/grubify-frontend/src/types/index.ts
+index d6a02a7e3a829bd5255154d6b7c86a9cc36746a9..29ccd5a8eca460d9d8e914600c1907b1494da272 100644
+--- a/grubify-frontend/src/types/index.ts
++++ b/grubify-frontend/src/types/index.ts
+@@ -93,6 +93,7 @@ export interface PlaceOrderRequest {
+   restaurantId: number;
+   items: CartItem[];
+   deliveryAddress: string;
++  customerPhone: string;
+   paymentMethod: string;
+   specialInstructions: string;
+ }
+diff --git a/scripts/verify-app.ps1 b/scripts/verify-app.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..f412b39f0a925215124a898cccda966f6f4d3379
+--- /dev/null
++++ b/scripts/verify-app.ps1
+@@ -0,0 +1,91 @@
++#Requires -Version 7.0
++param(
++    [Parameter(Mandatory)]
++    [uri]$BaseUrl,
++    [ValidateRange(1, 200)]
++    [int]$CartRequests = 150
++)
++
++$ErrorActionPreference = 'Stop'
++$base = $BaseUrl.AbsoluteUri.TrimEnd('/')
++$user = "verification-$([guid]::NewGuid().ToString('N'))"
++$checks = 0
++
++function Assert-Equal($Actual, $Expected, [string]$Description) {
++    if ($Actual -ne $Expected) {
++        throw "${Description}: expected '$Expected', got '$Actual'"
++    }
++    $script:checks++
++}
++
++function Send-Request([string]$Path, [string]$Method = 'Get', $Body = $null) {
++    $parameters = @{
++        Uri = "$base$Path"
++        Method = $Method
++        TimeoutSec = 30
++        SkipHttpErrorCheck = $true
++        MaximumRedirection = 0
++    }
++    if ($null -ne $Body) {
++        $parameters.ContentType = 'application/json'
++        $parameters.Body = $Body | ConvertTo-Json -Depth 12
++    }
++    Invoke-WebRequest @parameters
++}
++
++try {
++    Assert-Equal (Send-Request '/health').StatusCode 200 'Health'
++    Assert-Equal (Send-Request '/api/restaurants').StatusCode 200 'Restaurants'
++    Assert-Equal (Send-Request '/api/fooditems/restaurant/1').StatusCode 200 'Menu'
++    for ($i = 1; $i -le $CartRequests; $i++) {
++        $response = Send-Request "/api/cart/$user/items" 'Post' @{ foodItemId = 1; quantity = 1 }
++        Assert-Equal $response.StatusCode 200 "Cart request $i"
++    }
++    $cart = (Send-Request "/api/cart/$user").Content | ConvertFrom-Json
++    Assert-Equal $cart.items[0].quantity $CartRequests 'Accumulated quantity'
++    $id = $cart.items[0].id
++    Assert-Equal (Send-Request "/api/cart/$user/items/$id" 'Put' @{ quantity = 1 }).StatusCode 200 'Update quantity'
++    $cart = (Send-Request "/api/cart/$user").Content | ConvertFrom-Json
++    Assert-Equal $cart.total 21.34 'Cart total'
++    Assert-Equal (Send-Request "/api/cart/$user/items" 'Post' @{ foodItemId = 999; quantity = 1 }).StatusCode 400 'Unknown food rejected'
++    Assert-Equal (Send-Request "/api/cart/$user/items/$id" 'Put' @{ quantity = 0 }).StatusCode 400 'Invalid quantity rejected'
++
++    $body = @{
++        userId = $user
++        restaurantId = 1
++        items = $cart.items
++        deliveryAddress = '1 Verification Way'
++        customerPhone = '2025550100'
++        paymentMethod = 'cash-on-delivery'
++    }
++    # Prices and restaurant metadata must come from the server, not the client.
++    $body.items[0].foodItem.price = 0
++    $response = Send-Request '/api/orders' 'Post' $body
++    Assert-Equal $response.StatusCode 201 'Checkout'
++    $order = $response.Content | ConvertFrom-Json
++    Assert-Equal $order.total 21.34 'Order total'
++    Assert-Equal $order.subTotal $cart.subTotal 'Subtotal matches cart'
++    Assert-Equal $order.tax $cart.tax 'Tax matches cart'
++    Assert-Equal $order.deliveryFee $cart.deliveryFee 'Delivery fee matches cart'
++    Assert-Equal $order.restaurant.name "Tony's Italian Bistro" 'Restaurant details'
++    Assert-Equal $order.customerPhone '2025550100' 'Customer phone'
++    Assert-Equal ($order.estimatedDeliveryTime -gt 0) $true 'Delivery estimate'
++    $location = [string]$response.Headers.Location
++    Assert-Equal ($location.StartsWith('/api/', [StringComparison]::OrdinalIgnoreCase)) $true 'Relative order location'
++    Assert-Equal (Send-Request $location).StatusCode 200 'Order tracking'
++    $cancel = Send-Request "/api/orders/$($order.id)/cancel" 'Put'
++    Assert-Equal $cancel.StatusCode 200 'Cancellation'
++    Assert-Equal (($cancel.Content | ConvertFrom-Json).status) 7 'Cancelled status'
++    Start-Sleep -Seconds 32
++    $cancelled = (Send-Request "/api/orders/$($order.id)").Content | ConvertFrom-Json
++    Assert-Equal $cancelled.status 7 'Cancellation survives scheduled confirmation'
++
++    $body.items = @()
++    Assert-Equal (Send-Request '/api/orders' 'Post' $body).StatusCode 400 'Empty order rejected'
++    Assert-Equal (Send-Request "/api/cart/$user/items/$id" 'Delete').StatusCode 200 'Remove cart item'
++    $empty = (Send-Request "/api/cart/$user").Content | ConvertFrom-Json
++    Assert-Equal $empty.items.Count 0 'Cart emptied'
++    Write-Output "PASS: $checks assertions, $CartRequests cart requests, checkout, tracking and cancellation."
++} finally {
++    Assert-Equal (Send-Request "/api/cart/$user" 'Delete').StatusCode 200 'Verification cart cleanup'
++}
