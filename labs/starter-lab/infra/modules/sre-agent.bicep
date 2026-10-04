@@ -49,7 +49,7 @@ resource sreAgent 'Microsoft.App/agents@2025-05-01-preview' = {
       identity: identityId
     }
     actionConfiguration: {
-      mode: 'autonomous'
+      mode: 'review'
       identity: identityId
       accessLevel: 'Low'
     }

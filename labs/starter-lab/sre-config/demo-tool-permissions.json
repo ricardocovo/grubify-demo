@@ -1,0 +1,35 @@
+{
+  "allow": [
+    "SearchMemory",
+    "RunAzCliReadCommands",
+    "GetAzCliHelp",
+    "QueryLogAnalyticsByWorkspaceId",
+    "QueryAppInsightsByResourceId",
+    "FindConnectedGitHubRepo",
+    "GetIaCForGitHub",
+    "FetchGithubIssues",
+    "FetchGithubIssue",
+    "FetchGithubIssueComments",
+    "CreateGithubIssue"
+  ],
+  "ask": ["*"],
+  "deny": [
+    "RunAzCliWriteCommands",
+    "RunKubectlWriteCommand",
+    "RunInTerminal",
+    "RunShellCommand",
+    "ExecutePythonCode",
+    "*Update*",
+    "*Delete*",
+    "*Resolve*",
+    "*Mitigate*",
+    "*Deploy*",
+    "*Restart*",
+    "*Scale*",
+    "*CreatePullRequest*",
+    "*Commit*",
+    "*Push*",
+    "*CloseIncident*",
+    "*CompleteIncident*"
+  ]
+}

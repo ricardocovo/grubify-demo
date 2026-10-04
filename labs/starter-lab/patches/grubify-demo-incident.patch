@@ -1,0 +1,13 @@
+diff --git a/GrubifyApi/Controllers/OrdersController.cs b/GrubifyApi/Controllers/OrdersController.cs
+--- a/GrubifyApi/Controllers/OrdersController.cs
++++ b/GrubifyApi/Controllers/OrdersController.cs
+@@ -25,6 +25,9 @@ namespace GrubifyApi.Controllers
+ 
+         private PaymentResult ProcessPayment(string paymentMethod)
+         {
++            var gatewayCode = PaymentMethodRegistry.GetGatewayCode(paymentMethod);
++            Console.WriteLine($"Payment gateway method code: {gatewayCode}");
++
+             if (_isV2Version)
+             {
+                 // V2: BUG - Payment gateway configuration is incorrect in production

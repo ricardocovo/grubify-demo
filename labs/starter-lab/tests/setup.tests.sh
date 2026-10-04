@@ -159,10 +159,19 @@ fi
 grep -q 'API image build failed' "$TMP_DIR/output-build-failure.txt"
 unset TEST_FAIL_BUILD
 
+bash "$LAB_DIR/scripts/prepare-grubify-source.sh" "$TMP_DIR/demo-source" --demo-incident
+grep -q 'PaymentMethodRegistry.GetGatewayCode' "$TMP_DIR/demo-source/GrubifyApi/Controllers/OrdersController.cs"
+grep -q '"credit_card"' "$TMP_DIR/demo-source/GrubifyApi/PaymentMethodRegistry.cs"
+! grep -q 'RequestDataCache' "$TMP_DIR/demo-source/GrubifyApi/Controllers/CartController.cs"
+if bash "$LAB_DIR/scripts/prepare-grubify-source.sh" "$TMP_DIR/invalid-mode" --invalid > /dev/null 2>&1; then
+  echo 'Expected unknown source preparation mode to fail' >&2
+  exit 1
+fi
+
 ! grep -q 'api/v1/AgentMemory\|api/v1/incidentPlayground\|extendedAgent/connectors/github\|DataConnectors/github\|api/v1/github/config' "$LAB_DIR/scripts/post-provision.sh"
 grep -q '^hooks:' "$LAB_DIR/azure.yaml"
 grep -q 'postprovision:' "$LAB_DIR/azure.yaml"
 ! grep -q '^az login --use-device-code$\|^  azd auth login --use-device-code$' "$LAB_DIR/scripts/setup.sh"
 grep -q 'az account show' "$LAB_DIR/scripts/setup.sh"
 
-echo 'PASS: starter setup, patched image sources and fail-fast build checks'
+echo 'PASS: starter setup, normal/demo source preparation and fail-fast build checks'

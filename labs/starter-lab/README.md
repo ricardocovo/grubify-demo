@@ -97,6 +97,10 @@ both the upstream pin and the fixes.
 
 ## Quick Start
 
+For the controlled code-regression demonstration with read-only RCA and a GitHub
+handoff to Ricardo, see [the demo guide](demo/README.md). Fault injection is opt-in
+and is not part of the normal application build.
+
 ### One-Command Setup (Recommended)
 
 The `setup.sh` script handles prerequisites, login, and deployment. The `azd` post-provision hook configures the agent and fails the deployment if required agent components are missing.

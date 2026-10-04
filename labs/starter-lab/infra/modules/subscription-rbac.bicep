@@ -4,7 +4,7 @@ targetScope = 'subscription'
 param principalId string
 
 // Subscription-scoped RBAC for SRE Agent managed identity
-// These roles allow the agent to read resources, query logs, and manage container apps
+// Investigation-only roles; remediation stays with the human operator.
 
 var roles = [
   {
@@ -16,16 +16,8 @@ var roles = [
     id: '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
   }
   {
-    name: 'Monitoring Contributor'
-    id: '749f88d5-cbae-40b8-bcfc-e573ddc772fa'
-  }
-  {
     name: 'Log Analytics Reader'
     id: '73c42c96-874c-492b-b04d-ab87d138a893'
-  }
-  {
-    name: 'Container Apps Contributor'
-    id: '358470bc-b998-42bd-ab17-a7e34c199c0f'
   }
 ]
 
