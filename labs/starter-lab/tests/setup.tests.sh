@@ -161,7 +161,7 @@ unset TEST_FAIL_BUILD
 
 bash "$LAB_DIR/scripts/prepare-grubify-source.sh" "$TMP_DIR/demo-source" --demo-incident
 grep -q 'PaymentMethodRegistry.GetGatewayCode' "$TMP_DIR/demo-source/GrubifyApi/Controllers/OrdersController.cs"
-grep -q '"credit_card"' "$TMP_DIR/demo-source/GrubifyApi/PaymentMethodRegistry.cs"
+grep -q '"credit-card"' "$TMP_DIR/demo-source/GrubifyApi/PaymentMethodRegistry.cs"
 ! grep -q 'RequestDataCache' "$TMP_DIR/demo-source/GrubifyApi/Controllers/CartController.cs"
 if bash "$LAB_DIR/scripts/prepare-grubify-source.sh" "$TMP_DIR/invalid-mode" --invalid > /dev/null 2>&1; then
   echo 'Expected unknown source preparation mode to fail' >&2
