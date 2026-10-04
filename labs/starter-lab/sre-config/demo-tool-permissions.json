@@ -1,5 +1,12 @@
 {
   "allow": [
+    "ManageTodoList",
+    "ReadFile",
+    "Grep",
+    "GrepSearch",
+    "Glob",
+    "SearchTools",
+    "SearchTool",
     "SearchMemory",
     "RunAzCliReadCommands",
     "GetAzCliHelp",

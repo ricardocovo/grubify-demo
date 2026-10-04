@@ -49,8 +49,19 @@ foreach ($assignment in $assignments) {
     }
 }
 
-$agent.properties.actionConfiguration.mode = 'review'
-Set-ArmProperties $agent.id '2025-05-01-preview' @{ actionConfiguration = $agent.properties.actionConfiguration }
+if ($agent.properties.actionConfiguration.mode -ne 'review') {
+    $agent.properties.actionConfiguration.mode = 'review'
+    Set-ArmProperties $agent.id '2025-05-01-preview' @{ actionConfiguration = $agent.properties.actionConfiguration }
+}
+# The resource provider can asynchronously grant Monitoring Contributor on mode updates.
+Start-Sleep -Seconds 60
+$reconciled = @(Invoke-AzJson @('role', 'assignment', 'list', '--assignee', $identity.principalId, '--all', '--include-inherited'))
+foreach ($assignment in $reconciled) {
+    if ($assignment.roleDefinitionName -in @('Monitoring Contributor', 'Container Apps Contributor')) {
+        & az role assignment delete --ids $assignment.id
+        if ($LASTEXITCODE -ne 0) { throw "Failed to remove reconciled role $($assignment.roleDefinitionName)" }
+    }
+}
 
 $token = & az account get-access-token --resource https://azuresre.dev --query accessToken -o tsv
 if ($LASTEXITCODE -ne 0) { throw 'Could not authenticate to SRE Agent' }

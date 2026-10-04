@@ -10,6 +10,25 @@ copied into the API by the demo build. The extra integration change is in
 `../patches/grubify-demo-incident.patch`. Ricardo should implement the correction
 in this repository and rebuild the demo source, rather than changing upstream.
 
+## Prepared incident (2026-10-04)
+
+- Azure alert: `347807bc-740d-4077-beb2-bda726f9f000`, fired at
+  `2026-10-04T16:13:40Z`, severity 3.
+- SRE investigation thread: `4f7b16a1-4ebf-462e-92cd-e614c32dfe4d`,
+  title `[Sev3] alert-http-5xx-sre-lab`, Review mode.
+- Demo API revision: `ca-grubify-etyxjwt7mh7dc--0000006`.
+- Demo image digest:
+  `sha256:c1313aace8d00a947667b619da743e3795ee759e3eab6bd570b13eabaa743642`.
+- Verified: eight credit-card requests returned 500; `/health` and restaurants
+  returned 200; cash-on-delivery and digital-wallet returned 201.
+- Source commit: `8c07b90d97f0d4104175fa769e0c833145d4e4a2`.
+- SRE-created RCA and Ricardo handoff:
+  [GitHub issue #2](https://github.com/ricardocovo/grubify-demo/issues/2).
+
+Do not run normal `azd up` or the general post-provision hook before presenting:
+the normal build intentionally omits the demo defect, and general setup can replace
+the demo response plan. Use the dedicated demo setup script if reconfiguration is needed.
+
 ## Guardrails before generating errors
 
 From PowerShell 7:
@@ -28,6 +47,12 @@ remediation, terminal execution, incident updates/resolution, and code writes.
 GitHub issue creation is explicitly allowed; other unlisted tools require review.
 Do not approve any remediation request. The GitHub OAuth connector must already
 be healthy with issue-creation access to `ricardocovo/grubify-demo`.
+
+Azure's SRE service can reconcile a Monitoring Contributor assignment after setup
+or incident intake. Check the identity's effective roles again before presenting;
+rerun the demo configuration if a contributor grant returns. The script fails if
+its final role check finds a non-reader role. The global deny policy is an
+independent guardrail and must remain in place even when the roles look correct.
 
 The alert is set to `autoMitigate=false` for this controlled demonstration, so
 stopping test traffic does not automatically clear the alert. This is a stateless
