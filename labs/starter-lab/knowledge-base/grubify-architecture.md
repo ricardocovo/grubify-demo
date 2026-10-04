@@ -76,10 +76,10 @@ done
 
 | Setting | Value |
 |---------|-------|
-| Min replicas | 1 |
+| Min replicas | 2 |
 | Max replicas | 5 |
-| CPU | 0.5 cores |
-| Memory | 1 Gi |
+| CPU | 1 core |
+| Memory | 2 Gi |
 | Scale rule | HTTP concurrent requests > 50 |
 
 ---

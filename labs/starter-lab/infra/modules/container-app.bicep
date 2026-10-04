@@ -76,8 +76,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
           name: 'grubify-api'
           resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
+            cpu: json('1')
+            memory: '2Gi'
           }
           env: [
             {
@@ -92,8 +92,18 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        minReplicas: 1
+        minReplicas: 2
         maxReplicas: 5
+        rules: [
+          {
+            name: 'http-concurrency'
+            http: {
+              metadata: {
+                concurrentRequests: '50'
+              }
+            }
+          }
+        ]
       }
     }
   }
