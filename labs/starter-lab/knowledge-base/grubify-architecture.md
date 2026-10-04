@@ -82,6 +82,10 @@ done
 | Memory | 2 Gi |
 | Scale rule | HTTP concurrent requests > 50 |
 
+Cart and order data remains demo-only, in-memory state and is not shared between
+replicas. Autoscaling improves capacity but does not make this state durable or
+consistent; production use requires a shared data store.
+
 ---
 
 ## Monitoring & Alerting
