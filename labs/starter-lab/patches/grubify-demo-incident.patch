@@ -1,6 +1,18 @@
 diff --git a/GrubifyApi/Controllers/OrdersController.cs b/GrubifyApi/Controllers/OrdersController.cs
 --- a/GrubifyApi/Controllers/OrdersController.cs
 +++ b/GrubifyApi/Controllers/OrdersController.cs
+@@ -126,6 +126,11 @@ namespace GrubifyApi.Controllers
+ 
+             var pricing = new Cart { Items = items };
+ 
++            if (!PaymentMethodRegistry.IsSupported(request.PaymentMethod))
++            {
++                return BadRequest($"Unknown payment method: '{request.PaymentMethod}'");
++            }
++
+             // Process payment through gateway
+             var paymentResult = ProcessPayment(request.PaymentMethod);
+             if (!paymentResult.Success)
 @@ -25,6 +25,9 @@ namespace GrubifyApi.Controllers
  
          private PaymentResult ProcessPayment(string paymentMethod)
