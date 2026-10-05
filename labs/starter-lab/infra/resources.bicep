@@ -49,6 +49,7 @@ module containerApp 'modules/container-app.bicep' = {
     containerAppName: containerAppName
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
     logAnalyticsWorkspaceKey: monitoring.outputs.logAnalyticsWorkspaceKey
+    appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
   }
 }
 

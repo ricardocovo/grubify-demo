@@ -76,11 +76,12 @@ done
 
 | Setting | Value |
 |---------|-------|
-| Min replicas | 1 |
+| Min replicas | 2 |
 | Max replicas | 5 |
-| CPU | 0.5 cores |
-| Memory | 1 Gi |
-| Scale rule | HTTP concurrent requests > 50 |
+| HTTP scaling rule | Scale when concurrent requests exceed 50 |
+| CPU | 1.0 core |
+| Memory | 2 Gi |
+| Telemetry | Application Insights SDK using the Container App connection-string secret |
 
 ---
 
