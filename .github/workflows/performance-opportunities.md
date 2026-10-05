@@ -1,5 +1,5 @@
 ---
-name: performance-opportunities
+name: Performance Opportunities
 description: review the code and identify the top performance improvement opportunities
 on:
   workflow_dispatch:
