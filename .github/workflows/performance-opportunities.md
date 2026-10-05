@@ -28,17 +28,6 @@ safe-outputs:
     required-title-prefix: "[performance] "
     target: "*"
     max: 1
-evals:
-  - id: operational_value
-    question: 'Does the agent output demonstrate one labeled issue with up to five ranked, repository-specific performance improvements supported by concrete evidence and measurable validation methods, or an explicit no-op when none meet the evidence bar?'
-  - id: ranked_opportunities
-    question: 'Does the report present no more than five distinct opportunities in explicit priority order and state when fewer than five meet the evidence bar?'
-  - id: source_evidence
-    question: 'Does every reported opportunity cite a concrete repository path and a relevant symbol, line, test, or measurement?'
-  - id: validation_method
-    question: 'Does every reported opportunity include a concrete, measurable method for validating its expected performance benefit?'
-  - id: repository_labels
-    question: 'Does the agent output confirm that the performance report issue carries the existing report and agentic-workflows labels?'
 timeout-minutes: 30
 ---
 
