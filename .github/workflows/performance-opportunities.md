@@ -1,7 +1,6 @@
 ---
-name: i-want-to-find-performance-improvements-
-description: I want to find performance improvements opportunities. I want to rank the top 5 improvements I could do to make my repo better
-intent: Identify and rank the highest-impact, evidence-backed performance improvements in this repository.
+name: performance-opportunities
+description: review the code and identify the top performance improvement opportunities
 on:
   workflow_dispatch:
 permissions:
