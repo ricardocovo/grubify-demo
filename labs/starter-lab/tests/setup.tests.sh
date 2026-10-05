@@ -43,6 +43,8 @@ if [[ "$1 $2" == "acr build" ]]; then
   source_dir="$(dirname "$dockerfile")"
   if [[ "$source_dir" == */GrubifyApi ]]; then
     grep -q 'AddHealthChecks' "$source_dir/Program.cs" || exit 1
+    grep -q 'AddApplicationInsightsTelemetry' "$source_dir/Program.cs" || exit 1
+    grep -q 'Microsoft.ApplicationInsights.AspNetCore' "$source_dir/GrubifyApi.csproj" || exit 1
     ! grep -q 'RequestDataCache' "$source_dir/Controllers/CartController.cs" || exit 1
   else
     grep -q 'customerPhone: deliveryInfo.phone' "$source_dir/src/pages/CheckoutPage.tsx" || exit 1

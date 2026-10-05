@@ -420,11 +420,12 @@ diff --git a/GrubifyApi/Program.cs b/GrubifyApi/Program.cs
 index e37bf7efd683822f997cb05ea79eccc17c3ce8bc..69b035ebfaa186e1bc427a41712b23ef7da65ee4 100644
 --- a/GrubifyApi/Program.cs
 +++ b/GrubifyApi/Program.cs
-@@ -4,6 +4,7 @@ var builder = WebApplication.CreateBuilder(args);
+@@ -4,6 +4,8 @@ var builder = WebApplication.CreateBuilder(args);
  
  // Add services to the container.
  builder.Services.AddControllers();
 +builder.Services.AddHealthChecks();
++builder.Services.AddApplicationInsightsTelemetry();
  // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
  builder.Services.AddOpenApi();
  
@@ -435,6 +436,17 @@ index e37bf7efd683822f997cb05ea79eccc17c3ce8bc..69b035ebfaa186e1bc427a41712b23ef
 +app.MapHealthChecks("/health");
  
  app.Run();
+diff --git a/GrubifyApi/GrubifyApi.csproj b/GrubifyApi/GrubifyApi.csproj
+--- a/GrubifyApi/GrubifyApi.csproj
++++ b/GrubifyApi/GrubifyApi.csproj
+@@ -9,6 +9,7 @@
+ 
+   <ItemGroup>
+     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.8" />
++    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
+   </ItemGroup>
+ 
+ </Project>
 diff --git a/README.md b/README.md
 index 458c429582b991a530ffb95660eddabea388522a..e5612f7edd878d3413f514fb38b3b48d5053240a 100644
 --- a/README.md
